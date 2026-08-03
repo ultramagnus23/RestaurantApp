@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false)
 
       if (session?.user && (pathname === '/signin' || pathname === '/signup')) {
-        router.push('/dashboard')
+        router.push('/upload')
       }
     }
 

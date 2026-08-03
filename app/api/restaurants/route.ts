@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json()
-    const { name, location, timezone, max_capacity } = body
+    const { name, location, timezone } = body
 
     if (!name || !location) {
       return NextResponse.json(
@@ -48,7 +48,6 @@ export async function POST(req: Request) {
         name,
         location,
         timezone: timezone || 'Asia/Kolkata',
-        max_capacity,
       })
       .select()
       .single()

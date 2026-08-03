@@ -4,25 +4,24 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth-provider'
-import { FloorScene } from '@/components/landing/FloorScene'
 import { Button } from '@/components/ui/button'
-import { Camera, LayoutGrid, ClipboardList } from 'lucide-react'
+import { UploadCloud, ScanSearch, FileOutput } from 'lucide-react'
 
 const SEQUENCE = [
   {
-    icon: Camera,
-    title: 'A camera you already have',
-    body: 'Existing CCTV, pointed where it already is. No new hardware, no wiring, no install crew.',
+    icon: UploadCloud,
+    title: 'Upload your POS export',
+    body: 'Any CSV. Map its columns once - Meza remembers the mapping for next time.',
   },
   {
-    icon: LayoutGrid,
-    title: 'Becomes a floor plan',
-    body: 'Every table, live: seated or free, how long they have been there, how many are at it.',
+    icon: ScanSearch,
+    title: 'Meza checks what it can actually say',
+    body: 'It only runs an analysis if your data genuinely supports it, and says why in plain language when it can’t.',
   },
   {
-    icon: ClipboardList,
-    title: 'Becomes a decision',
-    body: 'Add a table at 8, hold the last seating, turn the music down before the room gets loud.',
+    icon: FileOutput,
+    title: 'One printable finding',
+    body: 'At most one sized leak, with the evidence and arithmetic shown, or an honest "no leak found."',
   },
 ]
 
@@ -32,7 +31,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!loading && user) {
-      router.push('/dashboard')
+      router.push('/upload')
     }
   }, [user, loading, router])
 
@@ -69,15 +68,12 @@ export default function Home() {
       {/* Hero */}
       <section className="max-w-5xl mx-auto px-6 pt-8 pb-20 sm:pt-16">
         <h1 className="font-display text-4xl sm:text-6xl font-bold tracking-tight max-w-2xl">
-          Know your floor.
+          One leak, sized, in your own numbers.
         </h1>
         <p className="mt-4 text-lg text-muted-foreground max-w-xl">
-          See every table, right now: seated or free, how long, how many. Read tonight against last
-          Tuesday. Decide before the room tells you.
+          Upload your POS export. Meza finds at most one revenue leak worth fixing, shows its
+          arithmetic, and tells you plainly when it can&apos;t find one.
         </p>
-        <div className="mt-8 max-w-2xl">
-          <FloorScene />
-        </div>
         <div className="mt-10">
           <Link href="/signup">
             <Button size="lg">Start free</Button>
@@ -87,7 +83,7 @@ export default function Home() {
 
       {/* Explainer: ruled ledger, not icon cards */}
       <section className="max-w-3xl mx-auto px-6 py-16 border-t border-border">
-        <h2 className="font-display text-2xl font-semibold mb-8">From camera to decision.</h2>
+        <h2 className="font-display text-2xl font-semibold mb-8">From CSV to one page.</h2>
         <div className="divide-y divide-border border-y border-border">
           {SEQUENCE.map((step, i) => (
             <div key={step.title} className="flex items-start gap-5 py-6">
@@ -108,26 +104,20 @@ export default function Home() {
       <section className="max-w-3xl mx-auto px-6 py-16 border-t border-border">
         <div className="font-mono text-xs leading-relaxed text-muted-foreground border border-border rounded-md p-5 space-y-2">
           <p className="text-foreground">Privacy</p>
-          <p>occupancy, not identity. no faces stored.</p>
-          <p>collects: anonymous counts, table state, queue length, wait time.</p>
-          <p>does not collect: names, phone numbers, ids, facial or biometric data, wifi tracking.</p>
-          <p>each camera frame is processed in memory and discarded. nothing is saved or transmitted.</p>
+          <p>customer names and phone numbers are dropped at upload, before storage.</p>
+          <p>payment identifiers are reduced to type (upi/card/cash) only.</p>
+          <p>no camera, microphone, or patron image/audio/video capability of any kind.</p>
         </div>
       </section>
 
       {/* Closing CTA */}
       <section className="max-w-3xl mx-auto px-6 py-20 border-t border-border text-center">
         <h2 className="font-display text-2xl sm:text-3xl font-semibold mb-6">
-          See tonight&apos;s floor.
+          Find out if there&apos;s a leak.
         </h2>
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link href="/signup">
             <Button size="lg">Start free</Button>
-          </Link>
-          <Link href="/signin">
-            <Button size="lg" variant="outline">
-              Try the demo
-            </Button>
           </Link>
         </div>
       </section>

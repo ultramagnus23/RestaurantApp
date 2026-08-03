@@ -9,13 +9,10 @@ import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
-  LayoutDashboard,
-  Activity,
-  CloudSun,
   FlaskConical,
-  Lightbulb,
-  Video,
   UploadCloud,
+  UtensilsCrossed,
+  FileText,
   LogOut,
   Building2,
   ChevronsUpDown,
@@ -25,14 +22,11 @@ import {
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/occupancy', label: 'Occupancy', icon: Activity },
-  { href: '/environment', label: 'Environment', icon: CloudSun },
   { href: '/experiments', label: 'Experiments', icon: FlaskConical },
-  { href: '/recommendations', label: 'Recommendations', icon: Lightbulb },
-  { href: '/cameras', label: 'Cameras', icon: Video },
   { href: '/devices', label: 'Devices', icon: Smartphone },
   { href: '/upload', label: 'Import POS data', icon: UploadCloud },
+  { href: '/dish-costs', label: 'Dish costs', icon: UtensilsCrossed },
+  { href: '/reports', label: 'Reports', icon: FileText },
 ]
 
 function NavLinks({ pathname, onNavigate }: { pathname: string; onNavigate?: () => void }) {

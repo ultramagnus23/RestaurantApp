@@ -52,7 +52,7 @@ export default function SignUpPage() {
       if (needsEmailConfirmation) {
         setConfirmationSent(true)
       } else {
-        router.push('/dashboard')
+        router.push('/create-restaurant')
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign up')

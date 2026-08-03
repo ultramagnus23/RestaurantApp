@@ -10,7 +10,13 @@
     "seed:demo": "node scripts/seed-demo.mjs",
     "seed:experiment-templates": "node scripts/seed-experiment-templates.mjs",
     "seed:experiment-001": "node scripts/seed-experiment-001.mjs",
-    "test:db": "supabase test db"
+    "test:db": "supabase test db",
+    "verify:pii-scrub": "tsx scripts/verify-pii-scrub.ts",
+    "verify:data-quality": "tsx scripts/verify-data-quality.ts",
+    "verify:analysis": "tsx scripts/verify-analysis.ts",
+    "verify:report": "tsx scripts/verify-report.ts",
+    "verify:all": "npm run verify:pii-scrub && npm run verify:data-quality && npm run verify:analysis && npm run verify:report",
+    "demo": "tsx scripts/demo.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

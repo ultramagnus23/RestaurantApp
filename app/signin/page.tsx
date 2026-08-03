@@ -39,7 +39,7 @@ export default function SignInPage() {
 
     try {
       await signIn(email, password)
-      router.push('/dashboard')
+      router.push('/upload')
     } catch (err: any) {
       setError(err.message || 'Failed to sign in')
     } finally {
@@ -53,9 +53,9 @@ export default function SignInPage() {
     setError('')
     try {
       await signIn(DEMO_EMAIL, DEMO_PASSWORD)
-      router.push('/dashboard')
+      router.push('/upload')
     } catch (err: any) {
-      setError(err.message || 'Demo account is not set up yet - see docs/DEPLOYMENT.md')
+      setError(err.message || 'Demo account is not set up yet')
     } finally {
       setDemoLoading(false)
     }

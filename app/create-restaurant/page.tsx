@@ -45,7 +45,7 @@ export default function CreateRestaurantPage() {
         throw new Error(res.error || 'Failed to create restaurant')
       }
 
-      router.push('/dashboard')
+      router.push('/upload')
     } catch (err: any) {
       setError(err.message)
     } finally {
