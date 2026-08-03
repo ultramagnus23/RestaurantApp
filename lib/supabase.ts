@@ -38,10 +38,10 @@ export function getServerSupabase(req: Request) {
 }
 
 // Privileged server-only client for trusted backend jobs that have no
-// restaurant-owner session to forward. Bypasses RLS by design - never
-// expose SUPABASE_SERVICE_ROLE_KEY to the browser, and never call this
-// from a route that handles a caller-supplied restaurant_id without
-// itself checking authorization first.
+// restaurant-owner session to forward (e.g. the recommendation engine cron
+// route). Bypasses RLS by design - never expose SUPABASE_SERVICE_ROLE_KEY
+// to the browser, and never call this from a route that handles a
+// user-supplied restaurant_id without itself checking authorization first.
 export function getServiceSupabase() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!isSupabaseConfigured || !serviceKey) {
@@ -52,6 +52,25 @@ export function getServiceSupabase() {
   return createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
 }
 
+// A percentage-of-frame ROI box: 0-1 fractions of frame width/height,
+// matching cv_pipeline/occupancy_detector.py's TABLE_REGIONS/QUEUE_REGION format.
+export type CameraRegion = {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+export type CameraTableRegion = CameraRegion & {
+  table_number: number
+}
+
+// A fractional (0-1), camera-frame-relative polygon point for zones.polygon.
+export type ZonePoint = {
+  x: number
+  y: number
+}
+
 export type Json =
   | string
   | number
@@ -60,9 +79,6 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-// Database types for the diagnostic-tool schema (supabase/migrations/001_initial_schema.sql).
-// The old platform's types (occupancy/experiments/environment/etc.) are
-// preserved in full on the archive/legacy branch, not carried forward here.
 export type Database = {
   public: {
     Tables: {
@@ -73,6 +89,7 @@ export type Database = {
           name: string
           location: string
           timezone: string
+          max_capacity: number | null
           created_at: string
           updated_at: string
         }
@@ -82,6 +99,7 @@ export type Database = {
           name: string
           location: string
           timezone?: string
+          max_capacity?: number | null
           created_at?: string
           updated_at?: string
         }
@@ -91,279 +109,960 @@ export type Database = {
           name?: string
           location?: string
           timezone?: string
+          max_capacity?: number | null
           created_at?: string
           updated_at?: string
         }
       }
-      venue_column_maps: {
+      occupancy_snapshots: {
         Row: {
           id: string
           restaurant_id: string
-          // canonical field name -> source CSV column name
-          mapping: Json
+          timestamp: string
+          occupancy_percentage: number | null
+          occupied_tables: number | null
+          available_tables: number | null
+          people_count: number | null
+          queue_length: number | null
+          wait_time: number | null
+          total_tables: number | null
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          timestamp?: string
+          occupancy_percentage?: number | null
+          occupied_tables?: number | null
+          available_tables?: number | null
+          people_count?: number | null
+          queue_length?: number | null
+          wait_time?: number | null
+          total_tables?: number | null
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          timestamp?: string
+          occupancy_percentage?: number | null
+          occupied_tables?: number | null
+          available_tables?: number | null
+          people_count?: number | null
+          queue_length?: number | null
+          wait_time?: number | null
+          total_tables?: number | null
+        }
+      }
+      table_sessions: {
+        Row: {
+          id: string
+          restaurant_id: string
+          table_number: number
+          party_size: number | null
+          start_time: string
+          end_time: string | null
+          dwell_time: number | null
+          order_value: number | null
+          item_count: number | null
+          dessert_count: number
+          drink_count: number
+          pass_time: string | null
+          clearance_pct: number | null
+          zone_id: string | null
+          occupancy_estimate: number | null
+          detection_confidence: number | null
+          source: 'cctv' | 'manual'
+          // status is DB-derived from end_time by a trigger
+          // (fn_sync_table_session_status, updated in 013_ingestion_automation.sql)
+          // on every insert/update - open iff end_time is null. 'merged'
+          // and 'interrupted' are the two values the trigger can't derive
+          // and passes through as-is - 'interrupted' is set by the
+          // ingestion worker when a session's zone goes stale beyond a
+          // timeout, never a guessed end_time.
+          status: 'open' | 'closed' | 'merged' | 'interrupted'
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          table_number: number
+          party_size?: number | null
+          start_time: string
+          end_time?: string | null
+          dwell_time?: number | null
+          order_value?: number | null
+          item_count?: number | null
+          dessert_count?: number
+          drink_count?: number
+          pass_time?: string | null
+          // 0-100, bussing-staff estimate; checked at the DB layer (008_pass_to_table.sql)
+          clearance_pct?: number | null
+          zone_id?: string | null
+          occupancy_estimate?: number | null
+          detection_confidence?: number | null
+          source?: 'cctv' | 'manual'
+          status?: 'open' | 'closed' | 'merged' | 'interrupted'
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          table_number?: number
+          party_size?: number | null
+          start_time?: string
+          end_time?: string | null
+          dwell_time?: number | null
+          order_value?: number | null
+          item_count?: number | null
+          dessert_count?: number
+          drink_count?: number
+          pass_time?: string | null
+          clearance_pct?: number | null
+          zone_id?: string | null
+          occupancy_estimate?: number | null
+          detection_confidence?: number | null
+          source?: 'cctv' | 'manual'
+          status?: 'open' | 'closed' | 'merged' | 'interrupted'
+        }
+      }
+      environment_snapshots: {
+        Row: {
+          id: string
+          restaurant_id: string
+          timestamp: string
+          temperature: number | null
+          humidity: number | null
+          weather: string | null
+          rainfall: boolean
+          music_genre: string | null
+          music_volume: number | null
+          lighting_brightness: number | null
+          lighting_temperature: number | null
+          promotion_active: boolean
+          special_event: string | null
+          staff_count: number | null
+          co2_ppm: number | null
+          pm25_ugm3: number | null
+          outdoor_aqi: number | null
+          lux: number | null
+          sound_level_db: number | null
+          source: 'manual' | 'sensor' | 'weather_api'
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          timestamp?: string
+          temperature?: number | null
+          humidity?: number | null
+          weather?: string | null
+          rainfall?: boolean
+          music_genre?: string | null
+          music_volume?: number | null
+          lighting_brightness?: number | null
+          lighting_temperature?: number | null
+          promotion_active?: boolean
+          special_event?: string | null
+          staff_count?: number | null
+          co2_ppm?: number | null
+          pm25_ugm3?: number | null
+          outdoor_aqi?: number | null
+          lux?: number | null
+          sound_level_db?: number | null
+          source?: 'manual' | 'sensor' | 'weather_api'
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          timestamp?: string
+          temperature?: number | null
+          humidity?: number | null
+          weather?: string | null
+          rainfall?: boolean
+          music_genre?: string | null
+          music_volume?: number | null
+          lighting_brightness?: number | null
+          lighting_temperature?: number | null
+          promotion_active?: boolean
+          special_event?: string | null
+          staff_count?: number | null
+          co2_ppm?: number | null
+          pm25_ugm3?: number | null
+          outdoor_aqi?: number | null
+          lux?: number | null
+          sound_level_db?: number | null
+          source?: 'manual' | 'sensor' | 'weather_api'
+        }
+      }
+      operational_snapshots: {
+        Row: {
+          id: string
+          restaurant_id: string
+          timestamp: string
+          staff_count: number | null
+          kitchen_load: number | null
+          service_time: number | null
+          order_prep_time: number | null
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          timestamp?: string
+          staff_count?: number | null
+          kitchen_load?: number | null
+          service_time?: number | null
+          order_prep_time?: number | null
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          timestamp?: string
+          staff_count?: number | null
+          kitchen_load?: number | null
+          service_time?: number | null
+          order_prep_time?: number | null
+        }
+      }
+      experiments: {
+        Row: {
+          id: string
+          restaurant_id: string
+          experiment_name: string
+          hypothesis: string
+          variable_changed: string
+          control_condition: string | null
+          test_condition: string | null
+          start_time: string
+          end_time: string | null
+          status: string
+          randomization_unit: 'session' | 'day' | 'table' | 'dish'
+          primary_metric: string
+          primary_metric_locked_at: string | null
+          secondary_metrics: string[]
+          min_detectable_effect: number | null
           created_at: string
-          updated_at: string
+          // Links to interventions() rows that constitute this experiment's
+          // treatment - see 009_pivot_data_model.sql.
+          linked_intervention_ids: string[]
         }
         Insert: {
           id?: string
           restaurant_id: string
-          mapping: Json
+          experiment_name: string
+          hypothesis: string
+          variable_changed: string
+          control_condition?: string | null
+          test_condition?: string | null
+          start_time: string
+          end_time?: string | null
+          status?: string
+          randomization_unit: 'session' | 'day' | 'table' | 'dish'
+          primary_metric: string
+          primary_metric_locked_at?: string | null
+          // Must include 'return_rate' - enforced by
+          // experiments_secondary_metrics_return_rate_check (007_experiment_lab.sql).
+          secondary_metrics: string[]
+          min_detectable_effect?: number | null
           created_at?: string
-          updated_at?: string
+          linked_intervention_ids?: string[]
         }
         Update: {
           id?: string
           restaurant_id?: string
-          mapping?: Json
+          experiment_name?: string
+          hypothesis?: string
+          variable_changed?: string
+          control_condition?: string | null
+          test_condition?: string | null
+          start_time?: string
+          end_time?: string | null
+          status?: string
+          randomization_unit?: 'session' | 'day' | 'table' | 'dish'
+          // primary_metric is rejected by fn_lock_primary_metric() once
+          // status is not 'planned' - see 007_experiment_lab.sql section F.
+          primary_metric?: string
+          primary_metric_locked_at?: string | null
+          secondary_metrics?: string[]
+          min_detectable_effect?: number | null
           created_at?: string
-          updated_at?: string
+          linked_intervention_ids?: string[]
         }
       }
-      ingestion_batches: {
+      experiment_treatments: {
         Row: {
           id: string
-          restaurant_id: string
-          filename: string | null
-          uploaded_at: string
-          rows_in: number
-          rows_parsed: number
-          rows_rejected: number
-          // array of {row_number, reason} - never just a count
-          rejection_reasons: Json
+          experiment_id: string
+          label: string
+          is_control: boolean
+          config: Json
+          created_at: string
         }
         Insert: {
           id?: string
-          restaurant_id: string
-          filename?: string | null
-          uploaded_at?: string
-          rows_in?: number
-          rows_parsed?: number
-          rows_rejected?: number
-          rejection_reasons?: Json
+          experiment_id: string
+          label: string
+          is_control?: boolean
+          // config.hold_temp_c, when present, is validated by
+          // fn_check_thermal_danger_zone() - must be <=4 or >=60.
+          config?: Json
+          created_at?: string
         }
         Update: {
           id?: string
-          restaurant_id?: string
-          filename?: string | null
-          uploaded_at?: string
-          rows_in?: number
-          rows_parsed?: number
-          rows_rejected?: number
-          rejection_reasons?: Json
+          experiment_id?: string
+          label?: string
+          is_control?: boolean
+          config?: Json
+          created_at?: string
         }
       }
-      bills: {
+      experiment_assignments: {
+        Row: {
+          id: string
+          experiment_id: string
+          treatment_id: string
+          unit_key: string
+          assigned_for: string
+          compliance_confirmed: boolean
+          compliance_note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          experiment_id: string
+          treatment_id: string
+          // Shape must match the parent experiment's randomization_unit
+          // (validated by fn_check_assignment_unit()): ISO date for 'day',
+          // numeric table number for 'table', non-empty text for 'dish'/'session'.
+          unit_key: string
+          assigned_for?: string
+          compliance_confirmed?: boolean
+          compliance_note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          experiment_id?: string
+          treatment_id?: string
+          unit_key?: string
+          assigned_for?: string
+          compliance_confirmed?: boolean
+          compliance_note?: string | null
+          created_at?: string
+        }
+      }
+      thermal_readings: {
         Row: {
           id: string
           restaurant_id: string
-          // Unique per (restaurant_id, external_bill_id) - the idempotency
-          // key re-ingest upserts against. Never globally unique.
-          external_bill_id: string
-          opened_at: string
-          settled_at: string | null
-          table_ref: string | null
-          gross: number
-          discount: number
-          payment_type: 'upi' | 'card' | 'cash' | 'other' | null
+          experiment_id: string | null
+          table_number: number | null
+          dish_name: string | null
+          stage: 'at_pass' | 'at_table'
+          temp_c: number
+          recorded_at: string
+          source: 'ir_manual' | 'ir_sensor'
           created_at: string
         }
         Insert: {
           id?: string
           restaurant_id: string
-          external_bill_id: string
-          opened_at: string
-          settled_at?: string | null
-          table_ref?: string | null
-          gross: number
-          discount?: number
-          payment_type?: 'upi' | 'card' | 'cash' | 'other' | null
+          experiment_id?: string | null
+          table_number?: number | null
+          dish_name?: string | null
+          stage: 'at_pass' | 'at_table'
+          temp_c: number
+          recorded_at?: string
+          source?: 'ir_manual' | 'ir_sensor'
           created_at?: string
         }
         Update: {
           id?: string
           restaurant_id?: string
-          external_bill_id?: string
-          opened_at?: string
-          settled_at?: string | null
-          table_ref?: string | null
-          gross?: number
-          discount?: number
-          payment_type?: 'upi' | 'card' | 'cash' | 'other' | null
+          experiment_id?: string | null
+          table_number?: number | null
+          dish_name?: string | null
+          stage?: 'at_pass' | 'at_table'
+          temp_c?: number
+          recorded_at?: string
+          source?: 'ir_manual' | 'ir_sensor'
           created_at?: string
         }
       }
-      bill_items: {
+      experiment_results: {
         Row: {
           id: string
-          bill_id: string
-          item_name_raw: string
-          item_name_norm: string | null
-          category: string | null
-          qty: number
-          price: number
-          created_at: string
+          experiment_id: string
+          revenue_delta: number | null
+          average_order_value_delta: number | null
+          dwell_time_delta: number | null
+          dessert_delta: number | null
+          drink_delta: number | null
+          confidence_score: number | null
+          measured_at: string
         }
         Insert: {
           id?: string
-          bill_id: string
-          item_name_raw: string
-          item_name_norm?: string | null
-          category?: string | null
-          qty?: number
-          price: number
-          created_at?: string
+          experiment_id: string
+          revenue_delta?: number | null
+          average_order_value_delta?: number | null
+          dwell_time_delta?: number | null
+          dessert_delta?: number | null
+          drink_delta?: number | null
+          confidence_score?: number | null
+          measured_at?: string
         }
         Update: {
           id?: string
-          bill_id?: string
-          item_name_raw?: string
-          item_name_norm?: string | null
-          category?: string | null
-          qty?: number
-          price?: number
-          created_at?: string
+          experiment_id?: string
+          revenue_delta?: number | null
+          average_order_value_delta?: number | null
+          dwell_time_delta?: number | null
+          dessert_delta?: number | null
+          drink_delta?: number | null
+          confidence_score?: number | null
+          measured_at?: string
         }
       }
-      dish_costs: {
+      recommendations: {
         Row: {
           id: string
           restaurant_id: string
-          item: string
-          cost: number
-          price: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          restaurant_id: string
-          item: string
-          cost: number
-          price: number
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          restaurant_id?: string
-          item?: string
-          cost?: number
-          price?: number
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      data_quality_profiles: {
-        Row: {
-          id: string
-          restaurant_id: string
-          computed_at: string
-          timestamps_live: boolean | null
-          timestamps_evidence: Json | null
-          table_ref_coverage_pct: number | null
-          item_name_consistency_pct: number | null
-          history_depth_days: number | null
-          weekly_volume: number | null
-          // {"attach_rate": {"allowed": bool, "reason": string|null}, ...} -
-          // the plain-language, owner-readable suppression reasons printed
-          // verbatim on the one-pager.
-          capability_mask: Json
-        }
-        Insert: {
-          id?: string
-          restaurant_id: string
-          computed_at?: string
-          timestamps_live?: boolean | null
-          timestamps_evidence?: Json | null
-          table_ref_coverage_pct?: number | null
-          item_name_consistency_pct?: number | null
-          history_depth_days?: number | null
-          weekly_volume?: number | null
-          capability_mask?: Json
-        }
-        Update: {
-          id?: string
-          restaurant_id?: string
-          computed_at?: string
-          timestamps_live?: boolean | null
-          timestamps_evidence?: Json | null
-          table_ref_coverage_pct?: number | null
-          item_name_consistency_pct?: number | null
-          history_depth_days?: number | null
-          weekly_volume?: number | null
-          capability_mask?: Json
-        }
-      }
-      leak_findings: {
-        Row: {
-          id: string
-          restaurant_id: string
-          rule: string
-          scope: string | null
-          size_inr_month: number | null
+          timestamp: string
+          recommendation: string
+          rule_key: string | null
           confidence: number | null
-          // the inline evidence + arithmetic a reader can audit
-          evidence: Json
-          status: 'candidate' | 'insufficient_data' | 'suppressed'
-          computed_at: string
+          expected_revenue_impact: number | null
+          implemented: boolean
+          implemented_at: string | null
         }
         Insert: {
           id?: string
           restaurant_id: string
-          rule: string
-          scope?: string | null
-          size_inr_month?: number | null
+          timestamp?: string
+          recommendation: string
+          rule_key?: string | null
           confidence?: number | null
-          evidence?: Json
-          status?: 'candidate' | 'insufficient_data' | 'suppressed'
-          computed_at?: string
+          expected_revenue_impact?: number | null
+          implemented?: boolean
+          implemented_at?: string | null
         }
         Update: {
           id?: string
           restaurant_id?: string
-          rule?: string
-          scope?: string | null
-          size_inr_month?: number | null
+          timestamp?: string
+          recommendation?: string
+          rule_key?: string | null
           confidence?: number | null
-          evidence?: Json
-          status?: 'candidate' | 'insufficient_data' | 'suppressed'
-          computed_at?: string
+          expected_revenue_impact?: number | null
+          implemented?: boolean
+          implemented_at?: string | null
         }
       }
-      reports: {
+      pos_orders: {
         Row: {
           id: string
           restaurant_id: string
-          // draft -> reviewed -> delivered. "delivered" requires an
-          // explicit manual action - nothing auto-advances a report here.
-          status: 'draft' | 'reviewed' | 'delivered'
-          headline_finding_id: string | null
-          // frozen one-pager content at generation time - auditable, not
-          // silently re-computed if underlying data changes later.
-          snapshot: Json
-          generated_at: string
-          reviewed_at: string | null
-          delivered_at: string | null
+          external_id: string | null
+          timestamp: string
+          order_type: string
+          channel: string
+          subtotal: number
+          tax: number
+          discount: number
+          total_amount: number
+          payment_method: string | null
+          guest_count: number | null
+          table_number: number | null
+          status: string
+          created_at: string
+          // 'csv' for pre-spine rows (backfilled), 'rista'/'petpooja'/'posist' for adapter ingestion.
+          pos_provider: string
+          raw_payload: Json | null
+          // true when |timestamp - server now()| exceeds the configured
+          // skew tolerance - the POS server's own clock vs Meza's. See
+          // 013_ingestion_automation.sql.
+          skew_suspect: boolean
         }
         Insert: {
           id?: string
           restaurant_id: string
-          status?: 'draft' | 'reviewed' | 'delivered'
-          headline_finding_id?: string | null
-          snapshot?: Json
-          generated_at?: string
-          reviewed_at?: string | null
-          delivered_at?: string | null
+          external_id?: string | null
+          timestamp?: string
+          order_type?: string
+          channel?: string
+          subtotal?: number
+          tax?: number
+          discount?: number
+          total_amount: number
+          payment_method?: string | null
+          guest_count?: number | null
+          table_number?: number | null
+          status?: string
+          created_at?: string
+          // Unique with external_id (nulls don't collide) - the idempotency
+          // key adapters upsert against. See 012_data_spine.sql section D.
+          pos_provider?: string
+          raw_payload?: Json | null
+          skew_suspect?: boolean
         }
         Update: {
           id?: string
           restaurant_id?: string
-          status?: 'draft' | 'reviewed' | 'delivered'
-          headline_finding_id?: string | null
-          snapshot?: Json
-          generated_at?: string
-          reviewed_at?: string | null
-          delivered_at?: string | null
+          external_id?: string | null
+          timestamp?: string
+          order_type?: string
+          channel?: string
+          subtotal?: number
+          tax?: number
+          discount?: number
+          total_amount?: number
+          payment_method?: string | null
+          guest_count?: number | null
+          table_number?: number | null
+          status?: string
+          created_at?: string
+          pos_provider?: string
+          raw_payload?: Json | null
+          skew_suspect?: boolean
+        }
+      }
+      pos_order_items: {
+        Row: {
+          id: string
+          order_id: string
+          item_name: string
+          category: string | null
+          quantity: number
+          price: number
+          total: number
+          is_dessert: boolean
+          is_drink: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          item_name: string
+          category?: string | null
+          quantity: number
+          price: number
+          total: number
+          is_dessert?: boolean
+          is_drink?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          item_name?: string
+          category?: string | null
+          quantity?: number
+          price?: number
+          total?: number
+          is_dessert?: boolean
+          is_drink?: boolean
+          created_at?: string
+        }
+      }
+      cameras: {
+        Row: {
+          id: string
+          restaurant_id: string
+          name: string
+          rtsp_url: string
+          status: 'active' | 'inactive' | 'error'
+          snapshot_interval_seconds: number
+          fps: number
+          table_regions: CameraTableRegion[]
+          queue_region: CameraRegion | null
+          last_snapshot_at: string | null
+          last_error: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          name: string
+          rtsp_url: string
+          status?: 'active' | 'inactive' | 'error'
+          snapshot_interval_seconds?: number
+          fps?: number
+          table_regions?: CameraTableRegion[]
+          queue_region?: CameraRegion | null
+          last_snapshot_at?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          name?: string
+          rtsp_url?: string
+          status?: 'active' | 'inactive' | 'error'
+          snapshot_interval_seconds?: number
+          fps?: number
+          table_regions?: CameraTableRegion[]
+          queue_region?: CameraRegion | null
+          last_snapshot_at?: string | null
+          last_error?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      zones: {
+        Row: {
+          id: string
+          restaurant_id: string
+          name: string
+          polygon: ZonePoint[]
+          camera_id: string | null
+          created_at: string
+          // null for pre-spine room-area zones never classified - not
+          // guessed, see 012_data_spine.sql section A.
+          type: 'table' | 'queue' | 'bar' | 'entry' | 'floor' | null
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          name: string
+          polygon: ZonePoint[]
+          camera_id?: string | null
+          created_at?: string
+          type?: 'table' | 'queue' | 'bar' | 'entry' | 'floor' | null
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          name?: string
+          polygon?: ZonePoint[]
+          camera_id?: string | null
+          created_at?: string
+          type?: 'table' | 'queue' | 'bar' | 'entry' | 'floor' | null
+        }
+      }
+      devices: {
+        Row: {
+          id: string
+          restaurant_id: string
+          device_type: 'phone' | 'cctv_bridge'
+          zone_id: string | null
+          token: string
+          status: 'pending' | 'active' | 'offline'
+          last_seen_at: string | null
+          created_at: string
+          // Set for cctv_bridge devices auto-provisioned by
+          // occupancy_detector.py - see 011_device_camera_link.sql.
+          camera_id: string | null
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          device_type: 'phone' | 'cctv_bridge'
+          zone_id?: string | null
+          token: string
+          status?: 'pending' | 'active' | 'offline'
+          last_seen_at?: string | null
+          created_at?: string
+          camera_id?: string | null
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          device_type?: 'phone' | 'cctv_bridge'
+          zone_id?: string | null
+          token?: string
+          status?: 'pending' | 'active' | 'offline'
+          last_seen_at?: string | null
+          created_at?: string
+          camera_id?: string | null
+        }
+      }
+      streams: {
+        Row: {
+          id: string
+          device_id: string
+          signal_type:
+            | 'sound_level_dba'
+            | 'sound_spectrum'
+            | 'light_level'
+            | 'light_color_temp'
+            | 'vibration'
+            | 'occupancy_count'
+            | 'zone_occupancy'
+            | 'music_tempo_bpm'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          device_id: string
+          signal_type:
+            | 'sound_level_dba'
+            | 'sound_spectrum'
+            | 'light_level'
+            | 'light_color_temp'
+            | 'vibration'
+            | 'occupancy_count'
+            | 'zone_occupancy'
+            | 'music_tempo_bpm'
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          device_id?: string
+          signal_type?:
+            | 'sound_level_dba'
+            | 'sound_spectrum'
+            | 'light_level'
+            | 'light_color_temp'
+            | 'vibration'
+            | 'occupancy_count'
+            | 'zone_occupancy'
+            | 'music_tempo_bpm'
+          created_at?: string
+        }
+      }
+      readings: {
+        Row: {
+          id: string
+          stream_id: string
+          // recorded_at equivalent (device/client-reported) - see
+          // 013_ingestion_automation.sql's timestamp-mapping note.
+          timestamp: string
+          value_json: Json
+          // ingested_at equivalent (server insert time).
+          created_at: string
+          // true when |timestamp - server now()| > the configured skew
+          // tolerance (default 60s) at insert time - flagged, never
+          // dropped, so alignment can exclude it without losing the fact
+          // that something was reported. See 013_ingestion_automation.sql.
+          skew_suspect: boolean
+        }
+        Insert: {
+          id?: string
+          stream_id: string
+          timestamp: string
+          value_json: Json
+          created_at?: string
+          skew_suspect?: boolean
+        }
+        Update: {
+          id?: string
+          stream_id?: string
+          timestamp?: string
+          value_json?: Json
+          created_at?: string
+          skew_suspect?: boolean
+        }
+      }
+      readings_rollup_1m: {
+        Row: {
+          stream_id: string
+          minute: string
+          mean: number | null
+          p50: number | null
+          p95: number | null
+          sample_count: number
+        }
+        Insert: {
+          stream_id: string
+          minute: string
+          mean?: number | null
+          p50?: number | null
+          p95?: number | null
+          sample_count: number
+        }
+        Update: {
+          stream_id?: string
+          minute?: string
+          mean?: number | null
+          p50?: number | null
+          p95?: number | null
+          sample_count?: number
+        }
+      }
+      interventions: {
+        Row: {
+          id: string
+          restaurant_id: string
+          timestamp: string
+          category:
+            | 'music'
+            | 'lighting'
+            | 'temperature'
+            | 'scent'
+            | 'layout'
+            | 'table_materials'
+            | 'menu'
+            | 'service_protocol'
+            | 'other'
+          description: string | null
+          zone_ids: string[]
+          // At least one of logged_by/logged_by_device_id is set - enforced
+          // by interventions_logged_by_check (010_intervention_device_attribution.sql).
+          logged_by: string | null
+          logged_by_device_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          timestamp?: string
+          category:
+            | 'music'
+            | 'lighting'
+            | 'temperature'
+            | 'scent'
+            | 'layout'
+            | 'table_materials'
+            | 'menu'
+            | 'service_protocol'
+            | 'other'
+          description?: string | null
+          zone_ids?: string[]
+          logged_by?: string | null
+          logged_by_device_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          timestamp?: string
+          category?:
+            | 'music'
+            | 'lighting'
+            | 'temperature'
+            | 'scent'
+            | 'layout'
+            | 'table_materials'
+            | 'menu'
+            | 'service_protocol'
+            | 'other'
+          description?: string | null
+          zone_ids?: string[]
+          logged_by?: string | null
+          logged_by_device_id?: string | null
+          created_at?: string
+        }
+      }
+      pos_sync_state: {
+        Row: {
+          pos_provider: string
+          restaurant_id: string
+          last_synced_at: string | null
+          cursor: string | null
+          status: 'idle' | 'syncing' | 'error'
+          // Adaptive cadence: worker computes this from restaurants.timezone
+          // service hours (frequent during service, hourly overnight) -
+          // see 013_ingestion_automation.sql.
+          next_poll_at: string | null
+        }
+        Insert: {
+          pos_provider: string
+          restaurant_id: string
+          last_synced_at?: string | null
+          cursor?: string | null
+          status?: 'idle' | 'syncing' | 'error'
+          next_poll_at?: string | null
+        }
+        Update: {
+          pos_provider?: string
+          restaurant_id?: string
+          last_synced_at?: string | null
+          cursor?: string | null
+          status?: 'idle' | 'syncing' | 'error'
+          next_poll_at?: string | null
+        }
+      }
+      source_health: {
+        Row: {
+          id: string
+          restaurant_id: string
+          source_type: 'pos' | 'cctv_zone' | 'phone'
+          // provider name for 'pos', zone_id for 'cctv_zone', device_id for 'phone' - always text
+          source_key: string
+          last_success_at: string | null
+          status: 'healthy' | 'stale' | 'error'
+          last_error: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          source_type: 'pos' | 'cctv_zone' | 'phone'
+          source_key: string
+          last_success_at?: string | null
+          status?: 'healthy' | 'stale' | 'error'
+          last_error?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          source_type?: 'pos' | 'cctv_zone' | 'phone'
+          source_key?: string
+          last_success_at?: string | null
+          status?: 'healthy' | 'stale' | 'error'
+          last_error?: string | null
+          updated_at?: string
+        }
+      }
+      ingestion_log: {
+        Row: {
+          id: string
+          source: string
+          restaurant_id: string | null
+          rows_in: number
+          rows_written: number
+          rows_skipped: number
+          error: string | null
+          ran_at: string
+        }
+        Insert: {
+          id?: string
+          source: string
+          restaurant_id?: string | null
+          rows_in?: number
+          rows_written?: number
+          rows_skipped?: number
+          error?: string | null
+          ran_at?: string
+        }
+        Update: {
+          id?: string
+          source?: string
+          restaurant_id?: string | null
+          rows_in?: number
+          rows_written?: number
+          rows_skipped?: number
+          error?: string | null
+          ran_at?: string
+        }
+      }
+      pos_credentials: {
+        Row: {
+          id: string
+          restaurant_id: string
+          provider: 'rista' | 'petpooja' | 'posist'
+          // Plain columns behind owner-only RLS, not encrypted at rest -
+          // see the SECURITY NOTE in 012_data_spine.sql section G.
+          api_key: string | null
+          api_secret: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          restaurant_id: string
+          provider: 'rista' | 'petpooja' | 'posist'
+          api_key?: string | null
+          api_secret?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          restaurant_id?: string
+          provider?: 'rista' | 'petpooja' | 'posist'
+          api_key?: string | null
+          api_secret?: string | null
+          created_at?: string
         }
       }
     }
@@ -371,7 +1070,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_restaurant_ids_for_user: {
+        Args: Record<string, never>
+        Returns: string[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -1,21 +1,61 @@
-MIT License
+ELASTIC LICENSE 2.0
 
-Copyright (c) 2026 Chaitanya Tripathi
+Copyright Chaitanya Tripathi
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This source code is licensed under the Elastic License 2.0 (the "License"). You
+may not use this file except in compliance with the License. You may obtain a
+copy of the License at:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+https://www.elastic.co/licensing/elastic-license/
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+TERMS AND CONDITIONS
+
+Please read these terms and conditions (these "Terms") carefully. By accessing or
+using any portion or all of the Elastic License, you agree to be bound by these
+Terms. If you do not agree to abide by the above, please do not use this content.
+
+1. LICENSE GRANT
+
+Subject to the terms and conditions of this Agreement, Licensor hereby grants
+Licensee a non-exclusive, non-transferable, non-sublicensable, revocable,
+worldwide, royalty-free license to use, copy, distribute, make available, and
+prepare derivative works of the software and associated documentation for
+Licensee's internal business purposes, subject to the Restrictions set forth in
+Section 2 below.
+
+2. RESTRICTIONS
+
+Licensee shall not:
+
+a) Except as expressly permitted in Section 1, use, copy, distribute, make
+   available, or prepare derivative works of the software for any commercial
+   purpose or for any public display (commercial or non-commercial).
+
+b) Remove any copyright, patent, trademark, attribution, notice or other
+   proprietary notices or labels on or within the software.
+
+c) Use the software for any purpose other than to develop, test, or run
+   applications for Licensee's internal business purposes.
+
+3. INTELLECTUAL PROPERTY RIGHTS
+
+The software is owned and copyrighted by Licensor and/or its affiliates. Licensor
+retains all right, title, and interest in and to the software, including all
+intellectual property rights therein.
+
+4. DISCLAIMER OF WARRANTIES
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE AND NONINFRINGEMENT.
+
+5. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INCIDENTAL, CONSEQUENTIAL, PUNITIVE,
+INDIRECT, SPECIAL, OR OTHER DAMAGES, EVEN IF LICENSOR HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGES.
+
+6. GOVERNING LAW
+
+This Agreement shall be governed by and construed in accordance with the laws of
+the Netherlands, excluding its conflicts of law principles.

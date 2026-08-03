@@ -9,6 +9,7 @@ import { api } from '@/lib/api-client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
+  FlaskConical,
   UploadCloud,
   UtensilsCrossed,
   FileText,
@@ -17,13 +18,12 @@ import {
   ChevronsUpDown,
   Menu,
   X,
+  Smartphone,
 } from 'lucide-react'
 
-// Trimmed for the diagnostic-tool rebuild (see the "Final Build" plan
-// discussion) - the old product's dashboard/occupancy/environment/
-// experiments/recommendations/cameras pages are archived (archive/legacy
-// branch), not part of this product.
 const NAV_ITEMS = [
+  { href: '/experiments', label: 'Experiments', icon: FlaskConical },
+  { href: '/devices', label: 'Devices', icon: Smartphone },
   { href: '/upload', label: 'Import POS data', icon: UploadCloud },
   { href: '/dish-costs', label: 'Dish costs', icon: UtensilsCrossed },
   { href: '/reports', label: 'Reports', icon: FileText },

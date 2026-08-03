@@ -1,0 +1,9 @@
+# Edge Sensor Dependencies
+#
+# weather_fetch.py is the only active script here (see README.md) and
+# needs only requests.
+requests>=2.31.0
+
+# legacy/collector.py's hardware-adapter dependencies (smbus2, pyserial,
+# adafruit-circuitpython-*, sounddevice, numpy) are no longer listed here -
+# that script is parked, not maintained. See legacy/collector.py's header.

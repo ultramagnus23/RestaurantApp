@@ -23,6 +23,19 @@ const nextConfig = {
           },
         ],
       },
+      {
+        // The phone capture page (app/capture/[token]) is the only route
+        // that needs camera/microphone/motion - explicitly scope those
+        // permissions to it rather than leaving them ungoverned app-wide.
+        // Nothing previously allowed or blocked these at the header level.
+        source: '/capture/:token*',
+        headers: [
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(self), microphone=(self), accelerometer=(self), gyroscope=(self)',
+          },
+        ],
+      },
     ]
   },
 }
